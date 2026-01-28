@@ -3,61 +3,56 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# 1. 設定
-# JSON_KEYFILE = r"C:\Users\mish-\OneDrive\Documents\GenAI\在庫管理\crucial-limiter-485602-b3-ee3cb1b718c9.json"
-# スプレッドシートのURLが https://docs.google.com/spreadsheets/d/◯◯◯/edit の場合、◯◯◯の部分です
-import streamlit as st
+# --- 1. 設定 ---
 SPREADSHEET_ID = st.secrets["SPREADSHEET_ID"]
 
-# 2. データの読み込み
+# --- 2. データの読み込み ---
 def connect_to_sheet():
-    # 権限の範囲設定
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    
-    # --- ここが修正ポイント！ ---
-    # パソコン内のファイルではなく、Streamlit CloudのSecrets（金庫）から情報を取ります
     try:
-        # Secretsに保存した「gcp_service_account」の中身を読み込む
         info = st.secrets["gcp_service_account"]
-        # スプレッドシートIDもSecretsから取得
         ss_id = st.secrets["SPREADSHEET_ID"]
-        
-        # 辞書データ(info)を使って認証
         creds = ServiceAccountCredentials.from_json_keyfile_dict(info, scope)
         client = gspread.authorize(creds)
-        
-        # スプレッドシートを開く
         sheet = client.open_by_key(ss_id).sheet1
         return sheet
     except Exception as e:
-        st.error(f"スプレッドシートに接続できませんでした。Secretsの設定を確認してください。エラー: {e}")
+        st.error(f"接続エラー: {e}")
         return None
 
 def load_data(sheet):
-    if sheet is None:
-        return pd.DataFrame()
+    if sheet is None: return pd.DataFrame()
     data = sheet.get_all_records()
     return pd.DataFrame(data)
 
-# アプリの見た目設定
-st.set_page_config(page_title="在庫管理システム", layout="centered")
-st.title("📦 在庫管理 (Spreadsheet連携)")
+# --- アプリの見た目設定 ---
+st.set_page_config(page_title="お買い物のリスト", layout="centered")
+
+# スマホでタイトルの余白を削るカスタムCSS
+st.markdown("""
+    <style>
+    .stButton button { width: 100%; border-radius: 10px; height: 3em; }
+    .reportview-container .main .block-container { padding-top: 1rem; }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("📦 お買い物リスト")
 
 # スプレッドシートに接続
 try:
     sheet = connect_to_sheet()
     df = load_data(sheet)
 except Exception as e:
-    st.error(f"スプレッドシートに接続できませんでした。IDや共有設定を確認してください。")
-    st.write(f"エラー内容: {e}")
+    st.error(f"スプレッドシートに接続できませんでした。")
     st.stop()
 
 # --- 在庫0アラート ---
 out_of_stock = df[df["在庫数"] == 0]
 if not out_of_stock.empty:
-    st.subheader("🚨 買い出しが必要")
-    for _, row in out_of_stock.iterrows():
-        st.error(f"‼️ **在庫切れ**：{row['商品名']} ({row['カテゴリー']})")
+    with st.container():
+        st.subheader("🚨 買うもの")
+        for _, row in out_of_stock.iterrows():
+            st.warning(f"🛒 **{row['商品名']}** ({row['カテゴリー']})")
 st.divider()
 
 # --- カテゴリーごとに表示 ---
@@ -68,32 +63,32 @@ for cat in categories:
         category_df = df[df["カテゴリー"] == cat]
         
         for index, row in category_df.iterrows():
-            # スプレッドシート上の行番号（見出し1行＋0始まりインデックス+1）
-            # データフレームのindexを使って元の行を特定します
             original_row_idx = index + 2
             
-            col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
-            
-            with col1:
+            # --- ここからスマホ最適化レイアウト ---
+            # 1行目: 商品名と在庫数
+            c1, c2 = st.columns([3, 1])
+            with c1:
                 if row["在庫数"] == 0:
-                    st.markdown(f":red[**{row['商品名']}**]")
+                    st.markdown(f"### :red[{row['商品名']}]")
                 else:
-                    st.write(row["商品名"])
-            
-            with col2:
-                st.write(f"**{row['在庫数']}**")
+                    st.markdown(f"### {row['商品名']}")
+            with c2:
+                st.markdown(f"<h3 style='text-align: right;'>{row['在庫数']}</h3>", unsafe_allow_html=True)
 
-            with col3:
-                if st.button("－1", key=f"min_{index}"):
+            # 2行目: 操作ボタン（マイナスとプラスを大きく配置）
+            b1, b2 = st.columns(2)
+            with b1:
+                if st.button(f"➖ 減らす", key=f"min_{index}"):
                     new_val = max(0, int(row["在庫数"]) - 1)
-                    sheet.update_cell(original_row_idx, 3, new_val) # 3列目(在庫数)を更新
+                    sheet.update_cell(original_row_idx, 3, new_val)
                     st.rerun()
-
-            with col4:
-                if st.button("＋1", key=f"plus_{index}"):
+            with b2:
+                if st.button(f"➕ 増やす", key=f"plus_{index}"):
                     new_val = int(row["在庫数"]) + 1
                     sheet.update_cell(original_row_idx, 3, new_val)
                     st.rerun()
-    st.write("") # カテゴリー間の余白
-    
+            
+            st.markdown("---") # 商品ごとの区切り線
 
+    st.write("")
