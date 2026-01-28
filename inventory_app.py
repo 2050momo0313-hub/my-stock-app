@@ -59,7 +59,7 @@ st.divider()
 categories = df["カテゴリー"].unique()
 
 for cat in categories:
-    with st.expander(f"📂 {cat}", expanded=True):
+    with st.expander(f"📂 {cat}", expanded=False):
         category_df = df[df["カテゴリー"] == cat]
         
         for index, row in category_df.iterrows():
@@ -92,3 +92,4 @@ for cat in categories:
             st.markdown("---") # 商品ごとの区切り線
 
     st.write("")
+
