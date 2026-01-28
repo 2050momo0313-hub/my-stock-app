@@ -4,20 +4,38 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # 1. 設定
-JSON_KEYFILE = r"C:\Users\mish-\OneDrive\Documents\GenAI\在庫管理\crucial-limiter-485602-b3-ee3cb1b718c9.json"
+# JSON_KEYFILE = r"C:\Users\mish-\OneDrive\Documents\GenAI\在庫管理\crucial-limiter-485602-b3-ee3cb1b718c9.json"
 # スプレッドシートのURLが https://docs.google.com/spreadsheets/d/◯◯◯/edit の場合、◯◯◯の部分です
-SPREADSHEET_ID = "1Iowg-r5FoR2G0AcdtzDMClWKtuZJSeirDEppgXCdY7U"
+import streamlit as st
+SPREADSHEET_ID = st.secrets["1Iowg-r5FoR2G0AcdtzDMClWKtuZJSeirDEppgXCdY7U"]
 
 # 2. データの読み込み
 def connect_to_sheet():
+    # 権限の範囲設定
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name(JSON_KEYFILE, scope)
-    client = gspread.authorize(creds)
-    # 1番目のシートを開く
-    sheet = client.open_by_key(SPREADSHEET_ID).sheet1
-    return sheet
+    
+    # --- ここが修正ポイント！ ---
+    # パソコン内のファイルではなく、Streamlit CloudのSecrets（金庫）から情報を取ります
+    try:
+        # Secretsに保存した「gcp_service_account」の中身を読み込む
+        info = st.secrets["gcp_service_account"]
+        # スプレッドシートIDもSecretsから取得
+        ss_id = st.secrets["SPREADSHEET_ID"]
+        
+        # 辞書データ(info)を使って認証
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(info, scope)
+        client = gspread.authorize(creds)
+        
+        # スプレッドシートを開く
+        sheet = client.open_by_key(ss_id).sheet1
+        return sheet
+    except Exception as e:
+        st.error(f"スプレッドシートに接続できませんでした。Secretsの設定を確認してください。エラー: {e}")
+        return None
 
 def load_data(sheet):
+    if sheet is None:
+        return pd.DataFrame()
     data = sheet.get_all_records()
     return pd.DataFrame(data)
 
