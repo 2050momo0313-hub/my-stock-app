@@ -7,7 +7,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 # JSON_KEYFILE = r"C:\Users\mish-\OneDrive\Documents\GenAI\在庫管理\crucial-limiter-485602-b3-ee3cb1b718c9.json"
 # スプレッドシートのURLが https://docs.google.com/spreadsheets/d/◯◯◯/edit の場合、◯◯◯の部分です
 import streamlit as st
-SPREADSHEET_ID = st.secrets["1Iowg-r5FoR2G0AcdtzDMClWKtuZJSeirDEppgXCdY7U"]
+SPREADSHEET_ID = st.secrets["SPREADSHEET_ID"]
 
 # 2. データの読み込み
 def connect_to_sheet():
@@ -96,3 +96,4 @@ for cat in categories:
                     st.rerun()
     st.write("") # カテゴリー間の余白
     
+
